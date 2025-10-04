@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Copy, RefreshCw, ThumbsUp, ThumbsDown, Plus } from "lucide-react";
@@ -27,6 +27,11 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [internalSavedConversationId, setInternalSavedConversationId] = useState<string | undefined>();
   const [messageRatings, setMessageRatings] = useState<Record<string, 'like' | 'dislike' | null>>({});
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   const handleCopyMessage = (content: string) => {
     navigator.clipboard.writeText(content);
@@ -88,29 +93,36 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
   };
 
   useEffect(() => {
-    if (messages.length > 1) {
-      const title = ChatStorage.generateConversationTitle(messages);
-      const conversation: SavedConversation = {
-        id: internalSavedConversationId || `conv_${Date.now()}`,
-        title,
-        messages,
-        createdAt: internalSavedConversationId ? ChatStorage.getConversation(internalSavedConversationId)?.createdAt || new Date() : new Date(),
-        updatedAt: new Date()
-      };
-      ChatStorage.saveConversation(conversation);
-      setInternalSavedConversationId(conversation.id);
-    }
+    const saveConversation = async () => {
+      if (messages.length > 1) {
+        const title = ChatStorage.generateConversationTitle(messages);
+        const existingConv = internalSavedConversationId ? await ChatStorage.getConversation(internalSavedConversationId) : null;
+        const conversation: SavedConversation = {
+          id: internalSavedConversationId || `conv_${Date.now()}`,
+          title,
+          messages,
+          createdAt: existingConv?.createdAt || new Date(),
+          updatedAt: new Date()
+        };
+        await ChatStorage.saveConversation(conversation);
+        setInternalSavedConversationId(conversation.id);
+      }
+    };
+    void saveConversation();
   }, [messages, internalSavedConversationId]);
 
   useEffect(() => {
-    if (savedConversationId) {
-      const conv = ChatStorage.getConversation(savedConversationId);
-      if (conv) {
-        setMessages(conv.messages);
-        setConversationId(conv.id);
-        setInternalSavedConversationId(conv.id);
+    const loadConversation = async () => {
+      if (savedConversationId) {
+        const conv = await ChatStorage.getConversation(savedConversationId);
+        if (conv) {
+          setMessages(conv.messages);
+          setConversationId(conv.id);
+          setInternalSavedConversationId(conv.id);
+        }
       }
-    }
+    };
+    void loadConversation();
   }, [savedConversationId]);
 
   useEffect(() => {
@@ -130,8 +142,8 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
     };
 
     setMessages(prev => [...prev, newMessage]);
-  // notify sidebar (and other listeners) that conversation updated
-  try { window.dispatchEvent(new CustomEvent('conversation-updated')); } catch (e) { /* ignore */ }
+    try { window.dispatchEvent(new CustomEvent('conversation-updated')); } catch (e) { /* ignore */ }
+    setTimeout(scrollToBottom, 100);
     const currentInput = input;
     setInput("");
     setIsTyping(true);
@@ -154,7 +166,8 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
       };
 
       setMessages((prev) => [...prev, aiResponse]);
-  try { window.dispatchEvent(new CustomEvent('conversation-updated')); } catch (e) { /* ignore */ }
+      try { window.dispatchEvent(new CustomEvent('conversation-updated')); } catch (e) { /* ignore */ }
+      setTimeout(scrollToBottom, 100);
 
       if (response.conversationId && response.conversationId !== currentConversationId) {
         setConversationId(response.conversationId);
@@ -168,6 +181,7 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
+      setTimeout(scrollToBottom, 100);
       toast.error("Errore nella comunicazione con il server");
     } finally {
       setIsTyping(false);
@@ -177,7 +191,6 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
   const handleNewConversation = async () => {
     const newConversationId = await ChatAPI.createConversation();
     setConversationId(newConversationId);
-    // Reset internal saved conversation id so a fresh conversation starts
     setInternalSavedConversationId(undefined);
     setMessages([
       {
@@ -187,8 +200,9 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
         timestamp: new Date(),
       },
     ]);
-  try { window.dispatchEvent(new CustomEvent('conversation-updated')); } catch (e) { /* ignore */ }
-  toast.success("Nuova conversazione iniziata");
+    setInput("");
+    try { window.dispatchEvent(new CustomEvent('conversation-updated')); } catch (e) { /* ignore */ }
+    toast.success("Nuova conversazione iniziata");
   };
 
   return (
@@ -201,7 +215,7 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6" id="chat-messages-container">
         {messages.map((message) => (
           <div key={message.id} className={cn("flex items-end", message.role === "user" ? "justify-end" : "justify-start")}>
             {message.role === "assistant" && (
@@ -210,13 +224,13 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
               </div>
             )}
 
-            <div className={cn("max-w-[80%] rounded-2xl p-4 shadow-[var(--shadow-soft)]",
+            <div className={cn("max-w-[85%] rounded-2xl p-5 shadow-lg",
               message.role === "user"
                 ? "bg-primary text-primary-foreground rounded-br-md rounded-tl-2xl ml-auto"
                 : "bg-card border border-border rounded-bl-md rounded-tr-2xl"
             )}>
-              <div className="prose prose-sm max-w-none dark:prose-invert text-sm leading-relaxed">
-                <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              <div className="prose prose-sm max-w-none dark:prose-invert leading-relaxed">
+                <p className="whitespace-pre-wrap break-words text-base">{message.content}</p>
               </div>
 
               {Array.isArray(message.sources) && message.sources.length > 0 && (
@@ -264,6 +278,7 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
             )}
           </div>
         ))}
+        <div ref={messagesEndRef} />
 
         {isTyping && (
           <div className="flex items-start">

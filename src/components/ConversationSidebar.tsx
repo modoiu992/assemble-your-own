@@ -29,18 +29,19 @@ export const ConversationSidebar = ({ onSelectConversation, onNewChat }: Convers
   const [conversations, setConversations] = useState<SavedConversation[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
 
-  // Carica le conversazioni salvate
   useEffect(() => {
-    const savedConversations = ChatStorage.getAllConversations();
-    setConversations(savedConversations);
+    const loadConversations = async () => {
+      const savedConversations = await ChatStorage.getAllConversations();
+      setConversations(savedConversations);
+    };
+    void loadConversations();
   }, []);
 
-  // Aggiorna le conversazioni quando cambiano
   useEffect(() => {
-    const interval = setInterval(() => {
-      const savedConversations = ChatStorage.getAllConversations();
+    const interval = setInterval(async () => {
+      const savedConversations = await ChatStorage.getAllConversations();
       setConversations(savedConversations);
-    }, 1000); // Controlla ogni secondo per aggiornamenti
+    }, 2000);
 
     return () => clearInterval(interval);
   }, []);
@@ -164,9 +165,11 @@ export const ConversationSidebar = ({ onSelectConversation, onNewChat }: Convers
                             <AlertDialogFooter>
                               <AlertDialogCancel>Annulla</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => {
+                                onClick={async () => {
                                   if (deleteId) {
-                                    ChatStorage.deleteConversation(deleteId);
+                                    await ChatStorage.deleteConversation(deleteId);
+                                    const updated = await ChatStorage.getAllConversations();
+                                    setConversations(updated);
                                     toast.success("Conversazione eliminata");
                                     setDeleteId(null);
                                   }

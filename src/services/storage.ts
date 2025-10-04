@@ -1,4 +1,5 @@
 import { Message } from './api';
+import { supabase } from './supabase';
 
 export interface SavedConversation {
   id: string;
@@ -9,39 +10,58 @@ export interface SavedConversation {
 }
 
 export class ChatStorage {
-  private static readonly STORAGE_KEY = 'ai-drive-chats';
-
-  static saveConversation(conversation: SavedConversation): void {
+  static async saveConversation(conversation: SavedConversation): Promise<void> {
     try {
-      const conversations = this.getAllConversations();
-      const existingIndex = conversations.findIndex(c => c.id === conversation.id);
-      
-      if (existingIndex >= 0) {
-        conversations[existingIndex] = conversation;
+      const { data: existing } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('id', conversation.id)
+        .maybeSingle();
+
+      const conversationData = {
+        id: conversation.id,
+        user_id: 'default-user',
+        title: conversation.title,
+        messages: conversation.messages,
+        created_at: conversation.createdAt.toISOString(),
+        updated_at: conversation.updatedAt.toISOString(),
+      };
+
+      if (existing) {
+        await supabase
+          .from('conversations')
+          .update(conversationData)
+          .eq('id', conversation.id);
       } else {
-        conversations.push(conversation);
+        await supabase
+          .from('conversations')
+          .insert(conversationData);
       }
-      
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(conversations));
     } catch (error) {
       console.error('Error saving conversation:', error);
     }
   }
 
-  static getAllConversations(): SavedConversation[] {
+  static async getAllConversations(): Promise<SavedConversation[]> {
     try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
-      if (!stored) return [];
-      
-      const conversations = JSON.parse(stored);
-      return conversations.map((conv: any) => ({
-        ...conv,
-        createdAt: new Date(conv.createdAt),
-        updatedAt: new Date(conv.updatedAt),
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('user_id', 'default-user')
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      if (!data) return [];
+
+      return data.map((conv: any) => ({
+        id: conv.id,
+        title: conv.title,
         messages: conv.messages.map((msg: any) => ({
           ...msg,
           timestamp: new Date(msg.timestamp)
-        }))
+        })),
+        createdAt: new Date(conv.created_at),
+        updatedAt: new Date(conv.updated_at),
       }));
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -49,16 +69,38 @@ export class ChatStorage {
     }
   }
 
-  static getConversation(id: string): SavedConversation | null {
-    const conversations = this.getAllConversations();
-    return conversations.find(c => c.id === id) || null;
+  static async getConversation(id: string): Promise<SavedConversation | null> {
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error || !data) return null;
+
+      return {
+        id: data.id,
+        title: data.title,
+        messages: data.messages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        })),
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      };
+    } catch (error) {
+      console.error('Error getting conversation:', error);
+      return null;
+    }
   }
 
-  static deleteConversation(id: string): void {
+  static async deleteConversation(id: string): Promise<void> {
     try {
-      const conversations = this.getAllConversations();
-      const filtered = conversations.filter(c => c.id !== id);
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(filtered));
+      await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', id);
     } catch (error) {
       console.error('Error deleting conversation:', error);
     }
@@ -67,7 +109,7 @@ export class ChatStorage {
   static generateConversationTitle(messages: Message[]): string {
     const firstUserMessage = messages.find(msg => msg.role === 'user');
     if (!firstUserMessage || !firstUserMessage.content) return 'Nuova Conversazione';
-    
+
     const title = firstUserMessage.content.slice(0, 50);
     return title.length < firstUserMessage.content.length ? title + '...' : title;
   }
