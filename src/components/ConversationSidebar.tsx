@@ -12,10 +12,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRef } from "react";
-import { Plus, MessageSquare, Settings, Trash } from "lucide-react";
+import { Plus, MessageSquare, Trash, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { ChatStorage, SavedConversation } from "@/services/storage";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface ConversationSidebarProps {
@@ -27,23 +28,48 @@ export const ConversationSidebar = ({ onSelectConversation, onNewChat }: Convers
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState("1");
   const [conversations, setConversations] = useState<SavedConversation[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    const loadConversations = async () => {
+  const loadConversations = async () => {
+    setIsRefreshing(true);
+    try {
       const savedConversations = await ChatStorage.getAllConversations();
       setConversations(savedConversations);
-    };
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      toast.error('Errore nel caricamento delle conversazioni');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
     void loadConversations();
   }, []);
 
+  // Realtime updates from Supabase
   useEffect(() => {
-    const interval = setInterval(async () => {
-      const savedConversations = await ChatStorage.getAllConversations();
-      setConversations(savedConversations);
-    }, 2000);
+    const channel = supabase
+      .channel('chats-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chats'
+        },
+        () => {
+          setTimeout(() => {
+            void loadConversations();
+          }, 0);
+        }
+      )
+      .subscribe();
 
-    return () => clearInterval(interval);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Auto-scroll to bottom when conversations change (new or updated)
@@ -64,16 +90,10 @@ export const ConversationSidebar = ({ onSelectConversation, onNewChat }: Convers
     }
   }, [conversations]);
 
-  // Listen to global updates triggered by ChatInterface for immediate scroll
+  // Listen to global updates triggered by ChatInterface for immediate reload
   useEffect(() => {
     const handler = () => {
-      try {
-        const root = (scrollAreaRef.current as any)?.querySelector?.('[data-radix-scroll-area-viewport]') || (scrollAreaRef.current as any)?.querySelector?.('div');
-        if (root) {
-          if (typeof root.scrollTo === 'function') root.scrollTo({ top: root.scrollHeight, behavior: 'smooth' });
-          else root.scrollTop = root.scrollHeight;
-        }
-      } catch (e) {}
+      void loadConversations();
     };
     window.addEventListener('conversation-updated', handler as EventListener);
     return () => window.removeEventListener('conversation-updated', handler as EventListener);
@@ -82,10 +102,20 @@ export const ConversationSidebar = ({ onSelectConversation, onNewChat }: Convers
   return (
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
       {/* New Chat Button */}
-      <div className="p-4 border-b border-sidebar-border">
+      <div className="p-4 border-b border-sidebar-border space-y-2">
         <Button className="w-full justify-start gap-2" size="lg" onClick={onNewChat}>
           <Plus className="h-5 w-5" />
           Nuova Chat
+        </Button>
+        <Button 
+          variant="outline" 
+          className="w-full justify-start gap-2" 
+          size="sm"
+          onClick={() => void loadConversations()}
+          disabled={isRefreshing}
+        >
+          <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+          Aggiorna
         </Button>
       </div>
 
