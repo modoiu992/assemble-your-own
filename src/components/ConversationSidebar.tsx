@@ -1,4 +1,15 @@
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, MessageSquare, Settings, Trash } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -6,7 +17,12 @@ import { useState, useEffect } from "react";
 import { ChatStorage, SavedConversation } from "@/services/storage";
 import { toast } from "sonner";
 
-export const ConversationSidebar = () => {
+interface ConversationSidebarProps {
+  onSelectConversation?: (id: string) => void;
+}
+
+export const ConversationSidebar = ({ onSelectConversation }: ConversationSidebarProps) => {
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState("1");
   const [conversations, setConversations] = useState<SavedConversation[]>([]);
 
@@ -61,7 +77,10 @@ export const ConversationSidebar = () => {
                 return (
                   <button
                     key={conv.id}
-                    onClick={() => setActiveId(conv.id)}
+                    onClick={() => {
+                      setActiveId(conv.id);
+                      if (onSelectConversation) onSelectConversation(conv.id);
+                    }}
                     className={cn(
                       "w-full text-left rounded-md p-3 transition-all group hover:bg-sidebar-accent",
                       activeId === conv.id && "bg-sidebar-accent"
@@ -85,18 +104,41 @@ export const ConversationSidebar = () => {
                         </p>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 w-6 p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            ChatStorage.deleteConversation(conv.id);
-                            toast.success("Conversazione eliminata");
-                          }}
-                        >
-                          <Trash className="h-3 w-3 text-destructive" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteId(conv.id);
+                              }}
+                            >
+                              <Trash className="h-3 w-3 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Elimina conversazione?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Sei sicuro di voler eliminare questa conversazione? Questa azione non può essere annullata.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => {
+                                  if (deleteId) {
+                                    ChatStorage.deleteConversation(deleteId);
+                                    toast.success("Conversazione eliminata");
+                                    setDeleteId(null);
+                                  }
+                                }}
+                              >Elimina</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                   </button>
@@ -108,14 +150,7 @@ export const ConversationSidebar = () => {
       </ScrollArea>
 
       {/* Bottom Navigation */}
-      <div className="border-t border-sidebar-border p-2">
-        <div className="space-y-1">
-          <Button variant="ghost" className="w-full justify-start gap-2" size="sm" onClick={() => toast.info("Impostazioni in arrivo!")}> 
-            <Settings className="h-4 w-4" />
-            Impostazioni
-          </Button>
-        </div>
-      </div>
+  {/* ...nessun pulsante impostazioni... */}
     </div>
   );
 };

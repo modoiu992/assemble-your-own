@@ -8,9 +8,11 @@ import { cn } from "@/lib/utils";
 const Chat = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [newConversationTrigger, setNewConversationTrigger] = useState(0);
+  const [activeConversationId, setActiveConversationId] = useState<string | undefined>(undefined);
 
   const handleNewConversation = () => {
     setNewConversationTrigger(prev => prev + 1);
+    setActiveConversationId(undefined);
   };
 
   return (
@@ -27,7 +29,7 @@ const Chat = () => {
             "absolute lg:relative h-full z-40"
           )}
         >
-          <ConversationSidebar />
+          <ConversationSidebar onSelectConversation={setActiveConversationId} />
         </aside>
 
         {/* Overlay for mobile */}
@@ -43,6 +45,7 @@ const Chat = () => {
           <ChatInterface 
             onNewConversation={handleNewConversation}
             newConversationTrigger={newConversationTrigger}
+            savedConversationId={activeConversationId}
           />
         </main>
 

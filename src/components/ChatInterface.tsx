@@ -10,9 +10,10 @@ import { toast } from "sonner";
 interface ChatInterfaceProps {
   onNewConversation?: () => void;
   newConversationTrigger?: number;
+  savedConversationId?: string;
 }
 
-export const ChatInterface = ({ onNewConversation, newConversationTrigger }: ChatInterfaceProps) => {
+export const ChatInterface = ({ onNewConversation, newConversationTrigger, savedConversationId }: ChatInterfaceProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -24,7 +25,7 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger }: Cha
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
-  const [savedConversationId, setSavedConversationId] = useState<string | undefined>();
+  const [internalSavedConversationId, setInternalSavedConversationId] = useState<string | undefined>();
   const [messageRatings, setMessageRatings] = useState<Record<string, 'like' | 'dislike' | null>>({});
 
   const handleCopyMessage = (content: string) => {
@@ -95,17 +96,28 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger }: Cha
     if (messages.length > 1) { // Solo se ci sono messaggi oltre quello iniziale
       const title = ChatStorage.generateConversationTitle(messages);
       const conversation: SavedConversation = {
-        id: savedConversationId || `conv_${Date.now()}`,
+        id: internalSavedConversationId || `conv_${Date.now()}`,
         title,
         messages,
-        createdAt: savedConversationId ? ChatStorage.getConversation(savedConversationId)?.createdAt || new Date() : new Date(),
+        createdAt: internalSavedConversationId ? ChatStorage.getConversation(internalSavedConversationId)?.createdAt || new Date() : new Date(),
         updatedAt: new Date()
       };
       
       ChatStorage.saveConversation(conversation);
-      setSavedConversationId(conversation.id);
+      setInternalSavedConversationId(conversation.id);
     }
-  }, [messages, savedConversationId]);
+  }, [messages, internalSavedConversationId]);
+  // Carica la conversazione selezionata quando cambia la prop
+  useEffect(() => {
+    if (savedConversationId) {
+      const conv = ChatStorage.getConversation(savedConversationId);
+      if (conv) {
+        setMessages(conv.messages);
+        setConversationId(conv.id);
+        setInternalSavedConversationId(conv.id);
+      }
+    }
+  }, [savedConversationId]);
 
   // Gestisce il trigger per nuova conversazione dalla sidebar
   useEffect(() => {
