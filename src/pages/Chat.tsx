@@ -7,6 +7,11 @@ import { cn } from "@/lib/utils";
 
 const Chat = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [newConversationTrigger, setNewConversationTrigger] = useState(0);
+
+  const handleNewConversation = () => {
+    setNewConversationTrigger(prev => prev + 1);
+  };
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -35,7 +40,10 @@ const Chat = () => {
 
         {/* Main Chat Area */}
         <main className="flex-1 min-w-0">
-          <ChatInterface />
+          <ChatInterface 
+            onNewConversation={handleNewConversation}
+            newConversationTrigger={newConversationTrigger}
+          />
         </main>
 
         {/* Document Panel - Hidden on mobile and tablet */}

@@ -1,18 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Copy, RefreshCw, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Send, Copy, RefreshCw, ThumbsUp, ThumbsDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ChatAPI, Message } from "@/services/api";
+import { ChatStorage, SavedConversation } from "@/services/storage";
+import { toast } from "sonner";
 
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-  sources?: Array<{ name: string; page?: number }>;
+interface ChatInterfaceProps {
+  onNewConversation?: () => void;
+  newConversationTrigger?: number;
 }
 
-export const ChatInterface = () => {
+export const ChatInterface = ({ onNewConversation, newConversationTrigger }: ChatInterfaceProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -23,8 +23,91 @@ export const ChatInterface = () => {
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationId, setConversationId] = useState<string | undefined>();
+  const [savedConversationId, setSavedConversationId] = useState<string | undefined>();
+  const [messageRatings, setMessageRatings] = useState<Record<string, 'like' | 'dislike' | null>>({});
 
-  const handleSend = () => {
+  const handleCopyMessage = (content: string) => {
+    navigator.clipboard.writeText(content);
+    toast.success("Messaggio copiato negli appunti");
+  };
+
+  const handleRegenerateMessage = async (messageId: string) => {
+    const messageIndex = messages.findIndex(msg => msg.id === messageId);
+    if (messageIndex === -1) return;
+
+    const previousUserMessage = messages[messageIndex - 1];
+    if (!previousUserMessage || previousUserMessage.role !== 'user') return;
+
+    setIsTyping(true);
+    
+    try {
+      const response = await ChatAPI.sendMessage(previousUserMessage.content, conversationId);
+      
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: response.response,
+        timestamp: new Date(),
+        sources: response.sources,
+      };
+      
+      // Rimuovi il messaggio precedente e aggiungi quello nuovo
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[messageIndex] = newMessage;
+        return newMessages;
+      });
+      
+    } catch (error) {
+      console.error('Error regenerating message:', error);
+      toast.error("Errore nella rigenerazione del messaggio");
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleRateMessage = (messageId: string, rating: 'like' | 'dislike') => {
+    setMessageRatings(prev => ({
+      ...prev,
+      [messageId]: prev[messageId] === rating ? null : rating
+    }));
+    
+    const action = rating === 'like' ? 'mi piace' : 'non mi piace';
+    const currentRating = messageRatings[messageId];
+    
+    if (currentRating === rating) {
+      toast.success(`Hai rimosso il ${action}`);
+    } else {
+      toast.success(`Hai messo ${action}`);
+    }
+  };
+
+  // Salva automaticamente la conversazione quando cambiano i messaggi
+  useEffect(() => {
+    if (messages.length > 1) { // Solo se ci sono messaggi oltre quello iniziale
+      const title = ChatStorage.generateConversationTitle(messages);
+      const conversation: SavedConversation = {
+        id: savedConversationId || `conv_${Date.now()}`,
+        title,
+        messages,
+        createdAt: savedConversationId ? ChatStorage.getConversation(savedConversationId)?.createdAt || new Date() : new Date(),
+        updatedAt: new Date()
+      };
+      
+      ChatStorage.saveConversation(conversation);
+      setSavedConversationId(conversation.id);
+    }
+  }, [messages, savedConversationId]);
+
+  // Gestisce il trigger per nuova conversazione dalla sidebar
+  useEffect(() => {
+    if (newConversationTrigger && newConversationTrigger > 0) {
+      handleNewConversation();
+    }
+  }, [newConversationTrigger]);
+
+  const handleSend = async () => {
     if (!input.trim()) return;
 
     const newMessage: Message = {
@@ -35,35 +118,87 @@ export const ChatInterface = () => {
     };
 
     setMessages([...messages, newMessage]);
+    const currentInput = input;
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Se non abbiamo un conversationId, ne creiamo uno nuovo
+      let currentConversationId = conversationId;
+      if (!currentConversationId) {
+        currentConversationId = await ChatAPI.createConversation();
+        setConversationId(currentConversationId);
+      }
+
+      // Chiamata al webhook
+      const response = await ChatAPI.sendMessage(currentInput, currentConversationId);
+      
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Questa è una risposta simulata. Il backend AI verrà integrato successivamente per fornire risposte reali basate sui tuoi documenti Google Drive.",
+        content: response.response,
         timestamp: new Date(),
-        sources: [
-          { name: "Budget_2024.xlsx", page: 2 },
-          { name: "Meeting_Notes.docx" },
-        ],
+        sources: response.sources,
       };
+      
       setMessages((prev) => [...prev, aiResponse]);
+      
+      // Aggiorna conversationId se ricevuto dal server
+      if (response.conversationId && response.conversationId !== currentConversationId) {
+        setConversationId(response.conversationId);
+      }
+      
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Messaggio di errore per l'utente
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Mi dispiace, si è verificato un errore durante l'invio del messaggio. Riprova tra qualche momento.",
+        timestamp: new Date(),
+      };
+      
+      setMessages((prev) => [...prev, errorMessage]);
+      
+      // Mostra toast di errore
+      toast.error("Errore nella comunicazione con il server");
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+  const handleNewConversation = async () => {
+    const newConversationId = await ChatAPI.createConversation();
+    setConversationId(newConversationId);
+    setSavedConversationId(undefined);
+    setMessages([
+      {
+        id: "1",
+        role: "assistant",
+        content: "Ciao! Sono il tuo assistente AI per Google Drive. Posso aiutarti a trovare informazioni nei tuoi documenti, rispondere a domande e molto altro. Come posso aiutarti oggi?",
+        timestamp: new Date(),
+      },
+    ]);
+    toast.success("Nuova conversazione iniziata");
   };
 
   return (
     <div className="flex flex-col h-full">
+      {/* Header con pulsante nuova conversazione */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
+        <h2 className="text-lg font-semibold">Chat</h2>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleNewConversation}
+          className="gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Nuova Chat
+        </Button>
+      </div>
+
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
         {messages.map((message) => (
@@ -106,16 +241,42 @@ export const ChatInterface = () => {
                 <div className="flex gap-2">
                   {message.role === "assistant" && (
                     <>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 w-7 p-0"
+                        onClick={() => handleCopyMessage(message.content)}
+                      >
                         <Copy className="h-3 w-3" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 w-7 p-0"
+                        onClick={() => handleRegenerateMessage(message.id)}
+                      >
                         <RefreshCw className="h-3 w-3" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className={cn(
+                          "h-7 w-7 p-0",
+                          messageRatings[message.id] === 'like' && "text-green-600 bg-green-50"
+                        )}
+                        onClick={() => handleRateMessage(message.id, 'like')}
+                      >
                         <ThumbsUp className="h-3 w-3" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className={cn(
+                          "h-7 w-7 p-0",
+                          messageRatings[message.id] === 'dislike' && "text-red-600 bg-red-50"
+                        )}
+                        onClick={() => handleRateMessage(message.id, 'dislike')}
+                      >
                         <ThumbsDown className="h-3 w-3" />
                       </Button>
                     </>
