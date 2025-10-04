@@ -83,6 +83,13 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger }: Cha
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   // Salva automaticamente la conversazione quando cambiano i messaggi
   useEffect(() => {
     if (messages.length > 1) { // Solo se ci sono messaggi oltre quello iniziale
