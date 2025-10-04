@@ -3,11 +3,15 @@ import { Header } from "@/components/Header";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { ChatInterface } from "@/components/ChatInterface";
 import { DocumentPanel } from "@/components/DocumentPanel";
+import { WebhookTest } from "@/components/WebhookTest";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { TestTube } from "lucide-react";
 
 const Chat = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [newConversationTrigger, setNewConversationTrigger] = useState(0);
+  const [showTest, setShowTest] = useState(false);
 
   const handleNewConversation = () => {
     setNewConversationTrigger(prev => prev + 1);
@@ -40,10 +44,29 @@ const Chat = () => {
 
         {/* Main Chat Area */}
         <main className="flex-1 min-w-0">
-          <ChatInterface 
-            onNewConversation={handleNewConversation}
-            newConversationTrigger={newConversationTrigger}
-          />
+          {showTest ? (
+            <div className="h-full flex items-center justify-center p-4">
+              <WebhookTest />
+            </div>
+          ) : (
+            <ChatInterface 
+              onNewConversation={handleNewConversation}
+              newConversationTrigger={newConversationTrigger}
+            />
+          )}
+          
+          {/* Test Toggle Button */}
+          <div className="absolute top-20 right-4 z-50">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowTest(!showTest)}
+              className="gap-2"
+            >
+              <TestTube className="h-4 w-4" />
+              {showTest ? "Nascondi Test" : "Test Webhook"}
+            </Button>
+          </div>
         </main>
 
         {/* Document Panel - Hidden on mobile and tablet */}

@@ -29,6 +29,9 @@ export class ChatAPI {
         userId: 'default-user' // TODO: Implementare autenticazione utente
       };
 
+      console.log('🚀 Invio messaggio al webhook:', WEBHOOK_URL);
+      console.log('📤 Payload:', requestBody);
+
       const response = await fetch(WEBHOOK_URL, {
         method: 'POST',
         headers: {
@@ -37,14 +40,17 @@ export class ChatAPI {
         body: JSON.stringify(requestBody),
       });
 
+      console.log('📡 Risposta HTTP:', response.status, response.statusText);
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('📥 Risposta ricevuta:', data);
       return data;
     } catch (error) {
-      console.error('Error sending message to webhook:', error);
+      console.error('❌ Errore invio messaggio al webhook:', error);
       throw error;
     }
   }
