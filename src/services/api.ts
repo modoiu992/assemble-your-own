@@ -40,37 +40,29 @@ export class ChatAPI {
       };
 
       const webhookUrl = getWebhookUrl();
-      console.log('🚀 Invio messaggio al webhook:', webhookUrl);
-      console.log('📤 Payload:', requestBody);
 
       const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Access-Control-Allow-Origin': '*',
         },
-        mode: 'cors', // Esplicita modalità CORS
+        mode: 'cors',
         body: JSON.stringify(requestBody),
       });
 
-      console.log('📡 Risposta HTTP:', response.status, response.statusText);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Errore HTTP:', response.status, errorText);
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      console.log('📥 Risposta ricevuta:', data);
       return data;
     } catch (error) {
       console.error('❌ Errore invio messaggio al webhook:', error);
       
       // Se è un errore CORS o di rete, proviamo con un formato diverso
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.log('🔄 Tentativo con formato alternativo...');
         return await this.sendMessageAlternative(message, conversationId);
       }
       
@@ -87,8 +79,6 @@ export class ChatAPI {
         id: conversationId || `conv_${Date.now()}`
       };
 
-      console.log('🔄 Tentativo formato alternativo:', simpleBody);
-
       const response = await fetch(getWebhookUrl(), {
         method: 'POST',
         headers: {
@@ -102,7 +92,6 @@ export class ChatAPI {
       }
 
       const data = await response.json();
-      console.log('📥 Risposta formato alternativo:', data);
       
       // Adatta la risposta al formato atteso
       return {
