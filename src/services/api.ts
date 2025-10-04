@@ -53,10 +53,36 @@ export class ChatAPI {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('❌ Errore HTTP dal webhook:', response.status, errorText);
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
-      const data = await response.json();
+      // Prova a leggere il corpo della risposta
+      const responseText = await response.text();
+      console.log('📥 Risposta webhook (raw):', responseText);
+      
+      if (!responseText || responseText.trim() === '') {
+        console.warn('⚠️ Risposta vuota dal webhook');
+        return {
+          response: 'Risposta ricevuta (vuota)',
+          sources: [],
+          conversationId: conversationId
+        };
+      }
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('❌ Errore parsing JSON:', e, 'Raw text:', responseText);
+        return {
+          response: responseText.slice(0, 500), // Mostra i primi 500 caratteri come testo
+          sources: [],
+          conversationId: conversationId
+        };
+      }
+      
+      console.log('📦 Dati parsati:', data);
       
       // Prova diversi formati di risposta e mostra sempre qualcosa
       // Formato 1: Array con output annidato [{"output":{"response":"...","sources":[]}}]
