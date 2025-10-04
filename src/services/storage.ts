@@ -12,6 +12,12 @@ export interface SavedConversation {
 export class ChatStorage {
   static async saveConversation(conversation: SavedConversation): Promise<void> {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No authenticated user');
+        return;
+      }
+
       const { data: existing } = await supabase
         .from('conversations')
         .select('id')
@@ -20,7 +26,7 @@ export class ChatStorage {
 
       const conversationData = {
         id: conversation.id,
-        user_id: 'default-user',
+        user_id: user.id,
         title: conversation.title,
         messages: conversation.messages,
         created_at: conversation.createdAt.toISOString(),
@@ -44,10 +50,13 @@ export class ChatStorage {
 
   static async getAllConversations(): Promise<SavedConversation[]> {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
       const { data, error } = await supabase
         .from('conversations')
         .select('*')
-        .eq('user_id', 'default-user')
+        .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
       if (error) throw error;

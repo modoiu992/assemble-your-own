@@ -1,6 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, Menu } from "lucide-react";
+import { Moon, Sun, Menu, LogOut } from "lucide-react";
 import { useState } from "react";
+import { AuthService } from "@/services/auth";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface HeaderProps {
   onToggleSidebar?: () => void;
@@ -8,6 +11,18 @@ interface HeaderProps {
 
 export const Header = ({ onToggleSidebar }: HeaderProps) => {
   const [isDark, setIsDark] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await AuthService.signOut();
+      toast.success("Disconnesso con successo");
+      navigate("/login");
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error("Errore durante la disconnessione");
+    }
+  };
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -42,6 +57,10 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
           {/* Theme Toggle */}
           <Button variant="ghost" size="sm" onClick={toggleTheme}>
             {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </Button>
+          {/* Logout Button */}
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <LogOut className="h-5 w-5" />
           </Button>
         </div>
       </div>

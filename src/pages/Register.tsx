@@ -6,6 +6,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router-dom";
+import { AuthService } from "@/services/auth";
+import { toast } from "sonner";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -17,6 +19,7 @@ const Register = () => {
     acceptTerms: false,
   });
   const [passwordStrength, setPasswordStrength] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   const calculatePasswordStrength = (password: string) => {
     let strength = 0;
@@ -32,10 +35,36 @@ const Register = () => {
     setPasswordStrength(calculatePasswordStrength(password));
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate registration
-    navigate("/chat");
+
+    if (formData.password !== formData.confirmPassword) {
+      toast.error("Le password non corrispondono");
+      return;
+    }
+
+    if (passwordStrength < 50) {
+      toast.error("La password è troppo debole. Usa almeno 8 caratteri con lettere, numeri e simboli.");
+      return;
+    }
+
+    if (!formData.acceptTerms) {
+      toast.error("Devi accettare i termini di servizio per continuare");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await AuthService.signUp(formData.email, formData.password, formData.fullName);
+      toast.success("Registrazione completata! Accesso in corso...");
+      navigate("/chat");
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      toast.error(error.message || "Errore durante la registrazione. Riprova.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -148,8 +177,8 @@ const Register = () => {
             </div>
 
             {/* Register Button */}
-            <Button type="submit" className="w-full" size="lg">
-              Registrati
+            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+              {isLoading ? "Registrazione in corso..." : "Registrati"}
             </Button>
           </form>
 

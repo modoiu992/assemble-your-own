@@ -5,17 +5,58 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { useNavigate } from "react-router-dom";
+import { AuthService } from "@/services/auth";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate login
-    navigate("/chat");
+    setIsLoading(true);
+
+    try {
+      await AuthService.signIn(email, password);
+      toast.success("Accesso effettuato con successo");
+      navigate("/chat");
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(error.message || "Errore durante l'accesso. Verifica le tue credenziali.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsResetting(true);
+
+    try {
+      await AuthService.resetPassword(resetEmail);
+      toast.success("Email di reset inviata. Controlla la tua casella di posta.");
+      setIsResetDialogOpen(false);
+      setResetEmail("");
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      toast.error(error.message || "Errore durante l'invio dell'email di reset.");
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   return (
@@ -75,14 +116,42 @@ const Login = () => {
                   Ricordami
                 </Label>
               </div>
-              <Button variant="link" className="px-0 h-auto" type="button">
-                Password dimenticata?
-              </Button>
+              <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="link" className="px-0 h-auto" type="button">
+                    Password dimenticata?
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Recupera Password</DialogTitle>
+                    <DialogDescription>
+                      Inserisci il tuo indirizzo email e ti invieremo un link per reimpostare la password.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handlePasswordReset} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="reset-email">Email</Label>
+                      <Input
+                        id="reset-email"
+                        type="email"
+                        placeholder="mario.rossi@example.com"
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={isResetting}>
+                      {isResetting ? "Invio in corso..." : "Invia Link di Reset"}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
 
             {/* Login Button */}
-            <Button type="submit" className="w-full" size="lg">
-              Accedi
+            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+              {isLoading ? "Accesso in corso..." : "Accedi"}
             </Button>
           </form>
 
