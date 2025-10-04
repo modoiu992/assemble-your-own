@@ -57,6 +57,16 @@ export class ChatAPI {
       }
 
       const data = await response.json();
+      
+      // Gestisci il formato di risposta del webhook che è un array con output annidato
+      if (Array.isArray(data) && data.length > 0 && data[0].output) {
+        return {
+          response: data[0].output.response || 'Nessuna risposta',
+          sources: data[0].output.sources || [],
+          conversationId: conversationId
+        };
+      }
+      
       return data;
     } catch (error) {
       console.error('❌ Errore invio messaggio al webhook:', error);
