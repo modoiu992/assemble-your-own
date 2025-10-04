@@ -9,6 +9,12 @@ export interface SavedConversation {
   updatedAt: Date;
 }
 
+interface DBMessage {
+  role: string;
+  content: string;
+  created_at: string;
+}
+
 export class ChatStorage {
   static async saveConversation(conversation: SavedConversation): Promise<void> {
     try {
@@ -25,13 +31,12 @@ export class ChatStorage {
         .maybeSingle();
 
       const conversationData = {
-        id: conversation.id,
         user_id: user.id,
         title: conversation.title,
-        messages: conversation.messages,
-        created_at: conversation.createdAt.toISOString(),
-        updated_at: conversation.updatedAt.toISOString(),
+        updated_at: new Date().toISOString(),
       };
+
+      let convId = conversation.id;
 
       if (existing) {
         await supabase
@@ -39,9 +44,35 @@ export class ChatStorage {
           .update(conversationData)
           .eq('id', conversation.id);
       } else {
-        await supabase
+        const { data: newConv, error } = await supabase
           .from('conversations')
-          .insert(conversationData);
+          .insert({ ...conversationData, id: conversation.id })
+          .select('id')
+          .single();
+
+        if (error) throw error;
+        if (newConv) convId = newConv.id;
+      }
+
+      const { data: existingMessages } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', convId);
+
+      const existingCount = existingMessages?.length || 0;
+      const newMessages = conversation.messages.slice(existingCount);
+
+      if (newMessages.length > 0) {
+        const messagesToInsert = newMessages.map(msg => ({
+          conversation_id: convId,
+          role: msg.role,
+          content: msg.content,
+          created_at: msg.timestamp.toISOString(),
+        }));
+
+        await supabase
+          .from('messages')
+          .insert(messagesToInsert);
       }
     } catch (error) {
       console.error('Error saving conversation:', error);
@@ -55,7 +86,7 @@ export class ChatStorage {
 
       const { data, error } = await supabase
         .from('conversations')
-        .select('*')
+        .select('id, title, created_at, updated_at')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
@@ -65,10 +96,7 @@ export class ChatStorage {
       return data.map((conv: any) => ({
         id: conv.id,
         title: conv.title,
-        messages: conv.messages.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        })),
+        messages: [],
         createdAt: new Date(conv.created_at),
         updatedAt: new Date(conv.updated_at),
       }));
@@ -80,23 +108,33 @@ export class ChatStorage {
 
   static async getConversation(id: string): Promise<SavedConversation | null> {
     try {
-      const { data, error } = await supabase
+      const { data: convData, error: convError } = await supabase
         .from('conversations')
-        .select('*')
+        .select('id, title, created_at, updated_at')
         .eq('id', id)
         .maybeSingle();
 
-      if (error || !data) return null;
+      if (convError || !convData) return null;
+
+      const { data: messages, error: msgError } = await supabase
+        .from('messages')
+        .select('role, content, created_at')
+        .eq('conversation_id', id)
+        .order('created_at', { ascending: true });
+
+      if (msgError) throw msgError;
 
       return {
-        id: data.id,
-        title: data.title,
-        messages: data.messages.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
+        id: convData.id,
+        title: convData.title,
+        messages: (messages || []).map((msg: DBMessage) => ({
+          id: Math.random().toString(36),
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
         })),
-        createdAt: new Date(data.created_at),
-        updatedAt: new Date(data.updated_at),
+        createdAt: new Date(convData.created_at),
+        updatedAt: new Date(convData.updated_at),
       };
     } catch (error) {
       console.error('Error getting conversation:', error);
