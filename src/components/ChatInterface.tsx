@@ -189,6 +189,20 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
   };
 
   const handleNewConversation = async () => {
+    if (messages.length > 1 && internalSavedConversationId) {
+      const title = ChatStorage.generateConversationTitle(messages);
+      const existingConv = await ChatStorage.getConversation(internalSavedConversationId);
+      const conversation: SavedConversation = {
+        id: internalSavedConversationId,
+        title,
+        messages,
+        createdAt: existingConv?.createdAt || new Date(),
+        updatedAt: new Date()
+      };
+      await ChatStorage.saveConversation(conversation);
+      try { window.dispatchEvent(new CustomEvent('conversation-updated')); } catch (e) { /* ignore */ }
+    }
+
     const newConversationId = await ChatAPI.createConversation();
     setConversationId(newConversationId);
     setInternalSavedConversationId(undefined);
