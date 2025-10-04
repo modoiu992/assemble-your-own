@@ -53,11 +53,62 @@ export class ChatAPI {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('❌ Errore HTTP dal webhook:', response.status, errorText);
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
-      const data = await response.json();
-      return data;
+      // Prova a leggere il corpo della risposta
+      const responseText = await response.text();
+      console.log('📥 Risposta webhook (raw):', responseText);
+      
+      if (!responseText || responseText.trim() === '') {
+        console.warn('⚠️ Risposta vuota dal webhook');
+        return {
+          response: 'Risposta ricevuta (vuota)',
+          sources: [],
+          conversationId: conversationId
+        };
+      }
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('❌ Errore parsing JSON:', e, 'Raw text:', responseText);
+        return {
+          response: responseText.slice(0, 500), // Mostra i primi 500 caratteri come testo
+          sources: [],
+          conversationId: conversationId
+        };
+      }
+      
+      console.log('📦 Dati parsati:', data);
+      
+      // Prova diversi formati di risposta e mostra sempre qualcosa
+      // Formato 1: Array con output annidato [{"output":{"response":"...","sources":[]}}]
+      if (Array.isArray(data) && data.length > 0 && data[0].output) {
+        return {
+          response: data[0].output.response || data[0].output.text || 'Risposta ricevuta',
+          sources: data[0].output.sources || [],
+          conversationId: conversationId
+        };
+      }
+      
+      // Formato 2: Oggetto diretto con response
+      if (data.response) {
+        return {
+          response: data.response,
+          sources: data.sources || [],
+          conversationId: data.conversationId || conversationId
+        };
+      }
+      
+      // Formato 3: Qualsiasi altro formato - prova a mostrare qualcosa
+      return {
+        response: data.text || data.message || JSON.stringify(data),
+        sources: [],
+        conversationId: conversationId
+      };
     } catch (error) {
       console.error('❌ Errore invio messaggio al webhook:', error);
       
@@ -91,13 +142,51 @@ export class ChatAPI {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      
-      // Adatta la risposta al formato atteso
+      // Leggi come testo per gestire risposte non-JSON
+      const responseText = await response.text();
+      console.log('📥 (ALT) Risposta webhook (raw):', responseText);
+
+      if (!responseText || responseText.trim() === '') {
+        return {
+          response: 'Risposta ricevuta (vuota)',
+          sources: [],
+          conversationId: conversationId
+        };
+      }
+
+      let data: any;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('❌ (ALT) Errore parsing JSON:', e, 'Raw text:', responseText);
+        return {
+          response: responseText.slice(0, 500),
+          sources: [],
+          conversationId: conversationId
+        };
+      }
+
+      // Adatta la risposta ai formati più comuni
+      if (Array.isArray(data) && data.length > 0 && data[0].output) {
+        return {
+          response: data[0].output.response || data[0].output.text || 'Risposta ricevuta',
+          sources: data[0].output.sources || [],
+          conversationId: conversationId
+        };
+      }
+
+      if (data.response) {
+        return {
+          response: data.response,
+          sources: data.sources || [],
+          conversationId: data.conversationId || conversationId
+        };
+      }
+
       return {
-        response: data.response || data.text || data.message || 'Risposta ricevuta',
-        sources: data.sources || [],
-        conversationId: data.conversationId || conversationId
+        response: data.text || data.message || JSON.stringify(data),
+        sources: [],
+        conversationId: conversationId
       };
     } catch (error) {
       console.error('❌ Errore anche con formato alternativo:', error);
