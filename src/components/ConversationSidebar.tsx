@@ -75,7 +75,9 @@ export const ConversationSidebar = () => {
                           </h4>
                         </div>
                         <p className="text-xs text-sidebar-foreground/60 truncate mt-1">
-                          {lastMessage ? lastMessage.content.slice(0, 50) + (lastMessage.content.length > 50 ? '...' : '') : 'Nessun messaggio'}
+                          {lastMessage?.content
+                            ? lastMessage.content.slice(0, 50) + (lastMessage.content.length > 50 ? '...' : '')
+                            : 'Nessun messaggio'}
                         </p>
                         <p className="text-xs text-sidebar-foreground/40 mt-1">
                           {getRelativeTime(conv.updatedAt)}
