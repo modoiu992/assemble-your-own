@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 export class AuthService {
   static async signUp(email: string, password: string, fullName: string) {
