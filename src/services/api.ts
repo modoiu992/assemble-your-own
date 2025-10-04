@@ -15,7 +15,7 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-  sources?: Array<{ name: string; page?: number }>;
+  sources?: Array<{ name: string; link: string }>;
 }
 
 export interface WebhookRequest {
@@ -26,7 +26,7 @@ export interface WebhookRequest {
 
 export interface WebhookResponse {
   response: string;
-  sources?: Array<{ name: string; page?: number }>;
+  sources?: Array<{ name: string; link: string }>;
   conversationId?: string;
 }
 

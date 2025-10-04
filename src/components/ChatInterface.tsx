@@ -236,8 +236,14 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger }: Cha
                   <ul className="text-xs space-y-1">
                     {message.sources.map((source, idx) => (
                       <li key={idx} className="text-muted-foreground">
-                        • {source.name}
-                        {source.page && ` (p.${source.page})`}
+                        <a 
+                          href={source.link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          • {source.name}
+                        </a>
                       </li>
                     ))}
                   </ul>
