@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, MessageSquare, Settings, MoreVertical } from "lucide-react";
+import { Plus, MessageSquare, Settings, Trash } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { ChatStorage, SavedConversation } from "@/services/storage";
+import { toast } from "sonner";
 
 export const ConversationSidebar = () => {
   const [activeId, setActiveId] = useState("1");
@@ -91,9 +92,10 @@ export const ConversationSidebar = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             ChatStorage.deleteConversation(conv.id);
+                            toast.success("Conversazione eliminata");
                           }}
                         >
-                          <MoreVertical className="h-3 w-3" />
+                          <Trash className="h-3 w-3 text-destructive" />
                         </Button>
                       </div>
                     </div>
@@ -108,7 +110,7 @@ export const ConversationSidebar = () => {
       {/* Bottom Navigation */}
       <div className="border-t border-sidebar-border p-2">
         <div className="space-y-1">
-          <Button variant="ghost" className="w-full justify-start gap-2" size="sm">
+          <Button variant="ghost" className="w-full justify-start gap-2" size="sm" onClick={() => toast.info("Impostazioni in arrivo!")}> 
             <Settings className="h-4 w-4" />
             Impostazioni
           </Button>
