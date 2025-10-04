@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Copy, RefreshCw, ThumbsUp, ThumbsDown, Plus } from "lucide-react";
@@ -41,10 +41,8 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
     if (!previousUserMessage || previousUserMessage.role !== 'user') return;
 
     setIsTyping(true);
-    
     try {
       const response = await ChatAPI.sendMessage(previousUserMessage.content, conversationId);
-      
       const newMessage: Message = {
         id: Date.now().toString(),
         role: "assistant",
@@ -52,14 +50,12 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
         timestamp: new Date(),
         sources: response.sources,
       };
-      
-      // Rimuovi il messaggio precedente e aggiungi quello nuovo
+
       setMessages(prev => {
         const newMessages = [...prev];
         newMessages[messageIndex] = newMessage;
         return newMessages;
       });
-      
     } catch (error) {
       console.error('Error regenerating message:', error);
       toast.error("Errore nella rigenerazione del messaggio");
@@ -73,10 +69,10 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
       ...prev,
       [messageId]: prev[messageId] === rating ? null : rating
     }));
-    
+
     const action = rating === 'like' ? 'mi piace' : 'non mi piace';
     const currentRating = messageRatings[messageId];
-    
+
     if (currentRating === rating) {
       toast.success(`Hai rimosso il ${action}`);
     } else {
@@ -87,13 +83,12 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
-  // Salva automaticamente la conversazione quando cambiano i messaggi
   useEffect(() => {
-    if (messages.length > 1) { // Solo se ci sono messaggi oltre quello iniziale
+    if (messages.length > 1) {
       const title = ChatStorage.generateConversationTitle(messages);
       const conversation: SavedConversation = {
         id: internalSavedConversationId || `conv_${Date.now()}`,
@@ -102,12 +97,11 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
         createdAt: internalSavedConversationId ? ChatStorage.getConversation(internalSavedConversationId)?.createdAt || new Date() : new Date(),
         updatedAt: new Date()
       };
-      
       ChatStorage.saveConversation(conversation);
       setInternalSavedConversationId(conversation.id);
     }
   }, [messages, internalSavedConversationId]);
-  // Carica la conversazione selezionata quando cambia la prop
+
   useEffect(() => {
     if (savedConversationId) {
       const conv = ChatStorage.getConversation(savedConversationId);
@@ -119,10 +113,9 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
     }
   }, [savedConversationId]);
 
-  // Gestisce il trigger per nuova conversazione dalla sidebar
   useEffect(() => {
     if (newConversationTrigger && newConversationTrigger > 0) {
-      handleNewConversation();
+      void handleNewConversation();
     }
   }, [newConversationTrigger]);
 
@@ -136,22 +129,22 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
       timestamp: new Date(),
     };
 
-    setMessages([...messages, newMessage]);
+    setMessages(prev => [...prev, newMessage]);
+  // notify sidebar (and other listeners) that conversation updated
+  try { window.dispatchEvent(new CustomEvent('conversation-updated')); } catch (e) { /* ignore */ }
     const currentInput = input;
     setInput("");
     setIsTyping(true);
 
     try {
-      // Se non abbiamo un conversationId, ne creiamo uno nuovo
       let currentConversationId = conversationId;
       if (!currentConversationId) {
         currentConversationId = await ChatAPI.createConversation();
         setConversationId(currentConversationId);
       }
 
-      // Chiamata al webhook
       const response = await ChatAPI.sendMessage(currentInput, currentConversationId);
-      
+
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -159,28 +152,22 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
         timestamp: new Date(),
         sources: response.sources,
       };
-      
+
       setMessages((prev) => [...prev, aiResponse]);
-      
-      // Aggiorna conversationId se ricevuto dal server
+  try { window.dispatchEvent(new CustomEvent('conversation-updated')); } catch (e) { /* ignore */ }
+
       if (response.conversationId && response.conversationId !== currentConversationId) {
         setConversationId(response.conversationId);
       }
-      
     } catch (error) {
       console.error('Error sending message:', error);
-      
-      // Messaggio di errore per l'utente
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: "Mi dispiace, si è verificato un errore durante l'invio del messaggio. Riprova tra qualche momento.",
         timestamp: new Date(),
       };
-      
       setMessages((prev) => [...prev, errorMessage]);
-      
-      // Mostra toast di errore
       toast.error("Errore nella comunicazione con il server");
     } finally {
       setIsTyping(false);
@@ -190,7 +177,8 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
   const handleNewConversation = async () => {
     const newConversationId = await ChatAPI.createConversation();
     setConversationId(newConversationId);
-    setSavedConversationId(undefined);
+    // Reset internal saved conversation id so a fresh conversation starts
+    setInternalSavedConversationId(undefined);
     setMessages([
       {
         id: "1",
@@ -199,129 +187,90 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
         timestamp: new Date(),
       },
     ]);
-    toast.success("Nuova conversazione iniziata");
+  try { window.dispatchEvent(new CustomEvent('conversation-updated')); } catch (e) { /* ignore */ }
+  toast.success("Nuova conversazione iniziata");
   };
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header con pulsante nuova conversazione */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
         <h2 className="text-lg font-semibold">Chat</h2>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={onNewConversation}
-          className="gap-2"
-        >
+        <Button variant="outline" size="sm" onClick={onNewConversation} className="gap-2">
           <Plus className="h-4 w-4" />
           Nuova Chat
         </Button>
       </div>
 
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
         {messages.map((message) => (
-          <div
-            key={message.id}
-            className={cn(
-              "flex",
-              message.role === "user" ? "justify-end" : "justify-start"
+          <div key={message.id} className={cn("flex items-end", message.role === "user" ? "justify-end" : "justify-start")}>
+            {message.role === "assistant" && (
+              <div className="flex-shrink-0 mr-3">
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-xs font-semibold shadow-soft">AI</div>
+              </div>
             )}
-          >
-            <div
-              className={cn(
-                "max-w-[80%] rounded-lg p-4 shadow-soft",
-                message.role === "user"
-                  ? "bg-primary text-primary-foreground ml-auto"
-                  : "bg-card border border-border"
-              )}
-            >
-              <div className="prose prose-sm max-w-none dark:prose-invert">
-                <p className="whitespace-pre-wrap">{message.content}</p>
+
+            <div className={cn("max-w-[80%] rounded-2xl p-4 shadow-[var(--shadow-soft)]",
+              message.role === "user"
+                ? "bg-primary text-primary-foreground rounded-br-md rounded-tl-2xl ml-auto"
+                : "bg-card border border-border rounded-bl-md rounded-tr-2xl"
+            )}>
+              <div className="prose prose-sm max-w-none dark:prose-invert text-sm leading-relaxed">
+                <p className="whitespace-pre-wrap break-words">{message.content}</p>
               </div>
 
-              {/* Fonti: mostra solo se ci sono fonti non vuote */}
               {Array.isArray(message.sources) && message.sources.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-border/50">
-                  <p className="text-xs font-medium mb-2 text-muted-foreground">
-                    📄 Fonti:
-                  </p>
+                <div className="mt-3 pt-3 border-t border-border/40">
+                  <p className="text-xs font-medium mb-2 text-muted-foreground">📄 Fonti:</p>
                   <ul className="text-xs space-y-1">
                     {message.sources.map((source, idx) => (
                       <li key={idx} className="text-muted-foreground">
-                        <a 
-                          href={source.link} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          • {source.name}
-                        </a>
+                        <a href={source.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">• {source.name}</a>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
-                <div className="flex gap-2">
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40">
+                <div className="flex gap-2 items-center">
                   {message.role === "assistant" && (
                     <>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 w-7 p-0"
-                        onClick={() => handleCopyMessage(message.content)}
-                      >
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleCopyMessage(message.content)}>
                         <Copy className="h-3 w-3" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 w-7 p-0"
-                        onClick={() => handleRegenerateMessage(message.id)}
-                      >
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleRegenerateMessage(message.id)}>
                         <RefreshCw className="h-3 w-3" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className={cn(
-                          "h-7 w-7 p-0",
-                          messageRatings[message.id] === 'like' && "text-green-600 bg-green-50"
-                        )}
-                        onClick={() => handleRateMessage(message.id, 'like')}
-                      >
+                      <Button variant="ghost" size="sm" className={cn("h-7 w-7 p-0", messageRatings[message.id] === 'like' && "text-green-600 bg-green-50")} onClick={() => handleRateMessage(message.id, 'like')}>
                         <ThumbsUp className="h-3 w-3" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className={cn(
-                          "h-7 w-7 p-0",
-                          messageRatings[message.id] === 'dislike' && "text-red-600 bg-red-50"
-                        )}
-                        onClick={() => handleRateMessage(message.id, 'dislike')}
-                      >
+                      <Button variant="ghost" size="sm" className={cn("h-7 w-7 p-0", messageRatings[message.id] === 'dislike' && "text-red-600 bg-red-50")} onClick={() => handleRateMessage(message.id, 'dislike')}>
                         <ThumbsDown className="h-3 w-3" />
                       </Button>
                     </>
                   )}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {message.timestamp.toLocaleTimeString("it-IT", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {message.timestamp.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
             </div>
+
+            {message.role === "user" && (
+              <div className="flex-shrink-0 ml-3">
+                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground font-medium">TU</div>
+              </div>
+            )}
           </div>
         ))}
 
         {isTyping && (
-          <div className="flex justify-start">
-            <div className="bg-card border border-border rounded-lg p-4 shadow-soft">
+          <div className="flex items-start">
+            <div className="mr-3">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-xs font-semibold shadow-soft">AI</div>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-3 shadow-soft">
               <div className="flex gap-1">
                 <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
                 <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.2s]" />
@@ -332,7 +281,6 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
         )}
       </div>
 
-      {/* Input Area */}
       <div className="border-t border-border bg-background px-4 py-4">
         <div className="relative max-w-4xl mx-auto">
           <Textarea
@@ -342,19 +290,14 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
             placeholder="Scrivi il tuo messaggio..."
             className="min-h-[60px] max-h-[200px] pr-12 resize-none"
           />
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim()}
-            size="sm"
-            className="absolute bottom-3 right-3 h-8 w-8 p-0"
-          >
+          <Button onClick={() => void handleSend()} disabled={!input.trim()} size="sm" className="absolute bottom-3 right-3 h-8 w-8 p-0">
             <Send className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-xs text-center text-muted-foreground mt-2">
-          Premi Invio per inviare, Shift + Invio per andare a capo
-        </p>
+        <p className="text-xs text-center text-muted-foreground mt-2">Premi Invio per inviare, Shift + Invio per andare a capo</p>
       </div>
     </div>
   );
 };
+
+export default ChatInterface;

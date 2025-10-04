@@ -11,6 +11,7 @@ import {
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useRef } from "react";
 import { Plus, MessageSquare, Settings, Trash } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -26,6 +27,7 @@ export const ConversationSidebar = ({ onSelectConversation, onNewChat }: Convers
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState("1");
   const [conversations, setConversations] = useState<SavedConversation[]>([]);
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
 
   // Carica le conversazioni salvate
   useEffect(() => {
@@ -43,6 +45,39 @@ export const ConversationSidebar = ({ onSelectConversation, onNewChat }: Convers
     return () => clearInterval(interval);
   }, []);
 
+  // Auto-scroll to bottom when conversations change (new or updated)
+  useEffect(() => {
+    // Try to scroll the Radix ScrollArea viewport to bottom if available
+    try {
+      const root = (scrollAreaRef.current as any)?.querySelector?.('[data-radix-scroll-area-viewport]') || (scrollAreaRef.current as any)?.querySelector?.('div');
+      if (root) {
+        // smooth when possible
+        if (typeof root.scrollTo === 'function') {
+          root.scrollTo({ top: root.scrollHeight, behavior: 'smooth' });
+        } else {
+          root.scrollTop = root.scrollHeight;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [conversations]);
+
+  // Listen to global updates triggered by ChatInterface for immediate scroll
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const root = (scrollAreaRef.current as any)?.querySelector?.('[data-radix-scroll-area-viewport]') || (scrollAreaRef.current as any)?.querySelector?.('div');
+        if (root) {
+          if (typeof root.scrollTo === 'function') root.scrollTo({ top: root.scrollHeight, behavior: 'smooth' });
+          else root.scrollTop = root.scrollHeight;
+        }
+      } catch (e) {}
+    };
+    window.addEventListener('conversation-updated', handler as EventListener);
+    return () => window.removeEventListener('conversation-updated', handler as EventListener);
+  }, []);
+
   return (
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
       {/* New Chat Button */}
@@ -54,7 +89,7 @@ export const ConversationSidebar = ({ onSelectConversation, onNewChat }: Convers
       </div>
 
       {/* Conversations List */}
-      <ScrollArea className="flex-1">
+  <ScrollArea ref={scrollAreaRef as any} className="flex-1">
         <div className="p-2">
           <div className="px-3 py-2">
             <h3 className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider">
