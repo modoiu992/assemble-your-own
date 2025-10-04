@@ -94,22 +94,22 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
 
   useEffect(() => {
     const saveConversation = async () => {
-      if (messages.length > 1) {
+      if (messages.length > 1 && conversationId) {
         const title = ChatStorage.generateConversationTitle(messages);
-        const existingConv = internalSavedConversationId ? await ChatStorage.getConversation(internalSavedConversationId) : null;
+        const existingConv = await ChatStorage.getConversation(conversationId);
         const conversation: SavedConversation = {
-          id: internalSavedConversationId || `conv_${Date.now()}`,
+          id: conversationId,
           title,
           messages,
           createdAt: existingConv?.createdAt || new Date(),
           updatedAt: new Date()
         };
         await ChatStorage.saveConversation(conversation);
-        setInternalSavedConversationId(conversation.id);
+        setInternalSavedConversationId(conversationId);
       }
     };
     void saveConversation();
-  }, [messages, internalSavedConversationId]);
+  }, [messages, conversationId]);
 
   useEffect(() => {
     const loadConversation = async () => {
@@ -189,11 +189,11 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger, saved
   };
 
   const handleNewConversation = async () => {
-    if (messages.length > 1 && internalSavedConversationId) {
+    if (messages.length > 1 && conversationId) {
       const title = ChatStorage.generateConversationTitle(messages);
-      const existingConv = await ChatStorage.getConversation(internalSavedConversationId);
+      const existingConv = await ChatStorage.getConversation(conversationId);
       const conversation: SavedConversation = {
-        id: internalSavedConversationId,
+        id: conversationId,
         title,
         messages,
         createdAt: existingConv?.createdAt || new Date(),
