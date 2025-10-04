@@ -66,7 +66,7 @@ export class ChatStorage {
 
   static generateConversationTitle(messages: Message[]): string {
     const firstUserMessage = messages.find(msg => msg.role === 'user');
-    if (!firstUserMessage) return 'Nuova Conversazione';
+    if (!firstUserMessage || !firstUserMessage.content) return 'Nuova Conversazione';
     
     const title = firstUserMessage.content.slice(0, 50);
     return title.length < firstUserMessage.content.length ? title + '...' : title;
