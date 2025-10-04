@@ -18,7 +18,6 @@ const Chat = () => {
   return (
     <div className="h-screen flex flex-col bg-background">
       <Header onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-      
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar - Hidden on mobile by default */}
         <aside
@@ -29,7 +28,7 @@ const Chat = () => {
             "absolute lg:relative h-full z-40"
           )}
         >
-          <ConversationSidebar onSelectConversation={setActiveConversationId} />
+          <ConversationSidebar onSelectConversation={setActiveConversationId} onNewChat={handleNewConversation} />
         </aside>
 
         {/* Overlay for mobile */}

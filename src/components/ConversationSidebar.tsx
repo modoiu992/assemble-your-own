@@ -19,9 +19,10 @@ import { toast } from "sonner";
 
 interface ConversationSidebarProps {
   onSelectConversation?: (id: string) => void;
+  onNewChat?: () => void;
 }
 
-export const ConversationSidebar = ({ onSelectConversation }: ConversationSidebarProps) => {
+export const ConversationSidebar = ({ onSelectConversation, onNewChat }: ConversationSidebarProps) => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState("1");
   const [conversations, setConversations] = useState<SavedConversation[]>([]);
@@ -46,7 +47,7 @@ export const ConversationSidebar = ({ onSelectConversation }: ConversationSideba
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
       {/* New Chat Button */}
       <div className="p-4 border-b border-sidebar-border">
-        <Button className="w-full justify-start gap-2" size="lg">
+        <Button className="w-full justify-start gap-2" size="lg" onClick={onNewChat}>
           <Plus className="h-5 w-5" />
           Nuova Chat
         </Button>
