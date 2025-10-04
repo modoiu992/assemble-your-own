@@ -228,7 +228,8 @@ export const ChatInterface = ({ onNewConversation, newConversationTrigger }: Cha
                 <p className="whitespace-pre-wrap">{message.content}</p>
               </div>
 
-              {message.sources && message.sources.length > 0 && (
+              {/* Fonti: mostra solo se ci sono fonti non vuote */}
+              {Array.isArray(message.sources) && message.sources.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-border/50">
                   <p className="text-xs font-medium mb-2 text-muted-foreground">
                     📄 Fonti:
