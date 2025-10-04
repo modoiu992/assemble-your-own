@@ -58,16 +58,31 @@ export class ChatAPI {
 
       const data = await response.json();
       
-      // Gestisci il formato di risposta del webhook che è un array con output annidato
+      // Prova diversi formati di risposta e mostra sempre qualcosa
+      // Formato 1: Array con output annidato [{"output":{"response":"...","sources":[]}}]
       if (Array.isArray(data) && data.length > 0 && data[0].output) {
         return {
-          response: data[0].output.response || 'Nessuna risposta',
+          response: data[0].output.response || data[0].output.text || 'Risposta ricevuta',
           sources: data[0].output.sources || [],
           conversationId: conversationId
         };
       }
       
-      return data;
+      // Formato 2: Oggetto diretto con response
+      if (data.response) {
+        return {
+          response: data.response,
+          sources: data.sources || [],
+          conversationId: data.conversationId || conversationId
+        };
+      }
+      
+      // Formato 3: Qualsiasi altro formato - prova a mostrare qualcosa
+      return {
+        response: data.text || data.message || JSON.stringify(data),
+        sources: [],
+        conversationId: conversationId
+      };
     } catch (error) {
       console.error('❌ Errore invio messaggio al webhook:', error);
       
