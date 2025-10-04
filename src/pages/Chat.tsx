@@ -48,10 +48,7 @@ const Chat = () => {
           />
         </main>
 
-        {/* Document Panel - Hidden on mobile and tablet */}
-        <aside className="w-80 shrink-0 hidden xl:block">
-          <DocumentPanel />
-        </aside>
+        {/* Document Panel rimosso */}
       </div>
     </div>
   );
